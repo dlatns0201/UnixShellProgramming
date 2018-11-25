@@ -42,11 +42,6 @@ int main(int argc, char**argv){
   int i=0;
   pid_t pid;
   int status, cmdsize;
-  struct sigaction act;
-  sigemptyset(&act.sa_mask);
-  act.sa_flags=SA_NOCLDSTOP;
-  act.sa_handler=SIG_IGN;
-  sigaction(SIGCHLD,&act,NULL);
   signal(SIGINT,SIG_IGN);
   signal(SIGQUIT,SIG_IGN);
   signal(SIGTSTP,SIG_IGN);
@@ -62,8 +57,9 @@ int main(int argc, char**argv){
 	  }
 	  switch(pid=fork()){
 		  case 0:
+			signal(SIGQUIT,SIG_DFL);
 			signal(SIGINT,SIG_DFL);
-			  if(!strcmp(cmdvector[0],"cd")){
+		  if(!strcmp(cmdvector[0],"cd")){
 				  exit(5);
 			  }
 			  if(!strcmp(cmdvector[cmdsize-1],"&")){

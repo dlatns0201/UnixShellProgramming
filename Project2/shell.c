@@ -16,7 +16,9 @@ void fatal(char *str) {
 	perror(str);
 	exit(1);
 }
-
+void zombie_handler(int unused){
+	waitpid(-1,NULL,WNOHANG);
+}
 int makelist(char *s, const char *delimiters, char** list, int MAX_LIST) {
 	int i = 0;
 	int numtokens = 0;
@@ -41,13 +43,13 @@ int makelist(char *s, const char *delimiters, char** list, int MAX_LIST) {
 
 int main(int argc, char**argv) {
 	int i = 0;
-	pid_t pid;
 	int status;
 	int cmdsize;
+	pid_t pid;
 	struct sigaction act;
 	sigemptyset(&act.sa_mask);
-	act.sa_handler=SIG_IGN;
-	act.sa_flags=SA_NOCLDSTOP;
+	act.sa_handler=zombie_handler;
+	act.sa_flags=SA_RESTART;
 	sigaction(SIGCHLD,&act,NULL);
 	signal(SIGSTOP,SIG_IGN);
 	signal(SIGINT,SIG_IGN);
@@ -64,6 +66,7 @@ int main(int argc, char**argv) {
 		switch (pid = fork()) {
 			case 0:
 				signal(SIGINT,SIG_DFL);
+				signal(SIGQUIT,SIG_DFL);
 				if (strcmp(cmdvector[0], "cd") == 0) {
 					exit(5);
 				}
@@ -77,7 +80,7 @@ int main(int argc, char**argv) {
 			default:
 				if(strcmp(cmdvector[cmdsize-1],"&")){
 					waitpid(pid,&status,0);
-}
+				}
 				if (WIFEXITED(status)) {
 					if (WEXITSTATUS(status) == 5) {
 						chdir(cmdvector[1]);
