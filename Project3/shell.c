@@ -109,56 +109,62 @@ int cmd_redir(char **cmd) {
 	}
 	return 0;
 }
-void cmd_pipe(char **cmd) {
-	int i;
-	pid_t pid1,pid2;
+int cmd_pipe(char **cmd) {
+	int i, k;
+	int flag = 0;
+	pid_t pid1, pid2;
 	int fd[2];
 	char* arr1[MAX_CMD_ARG];
 	char* arr2[MAX_CMD_ARG];
 	for (i = 0; cmd[i] != NULL; i++) {
 		if (!strcmp(cmd[i], "|")) {
 			arr1[i] = NULL;
+			flag = 1;
 			break;
 		}
 		arr1[i] = cmd[i];
 	}
-	int j = 0;
-	for (i = i + 1; cmd[i] != NULL; i++) {
-		arr2[j] = cmd[i];
-		j++;
-	}
-	int k;
-	for(k=0; arr1[k]!=NULL;k++){
-		fprintf(stderr,"%s\n",arr1[k]);
-	}
-	for(k=0; arr2[k]!=NULL; k++){
-		fprintf(stderr,"%s\n",arr2[k]);
-	}
-	pipe(fd);
-	switch (pid1 = fork()) {
-	case 0:
-		for (i = 0; arr1[i] != NULL; i++) {
-			if (!strcmp(arr1[i], "<") || !strcmp(arr1[i], ">")) {
-				cmd_redir(arr1);
-			}
+	if (flag == 1) {
+		int j = 0;
+		for (i = i + 1; cmd[i] != NULL; i++) {
+			arr2[j] = cmd[i];
+			j++;
 		}
-		dup2(fd[1], STDOUT_FILENO);
-		close(fd[1]);
-		close(fd[0]);
-		execvp(arr1[0], arr1);
-	}
-	switch (pid2 = fork()) {
-	case 0:
+		pipe(fd);
+
+		switch (pid1 = fork()) {
+		case 0:
+			for (i = 0; arr1[i] != NULL; i++) {
+				if (!strcmp(arr1[i], "<") || !strcmp(arr1[i], ">")) {
+					cmd_redir(arr1);
+					break;
+				}
+			}
+			dup2(fd[1], STDOUT_FILENO);
+			close(fd[1]);
+			close(fd[0]);
+			execvp(arr1[0], arr1);
+		}
+		switch (pid2 = fork()) {
+		case 0:
+			for (i = 0; arr2[i] != NULL; i++) {
+				if (!strcmp(arr2[i], "<") || !strcmp(arr2[i], ">")) {
+					cmd_redir(arr2);
+					break;
+				}
+			}
+			dup2(fd[0], STDIN_FILENO);
+			close(fd[1]);
+			close(fd[0]);
+			execvp(arr2[0], arr2);
+		}
 		for (i = 0; arr2[i] != NULL; i++) {
-			if (!strcmp(arr2[i], "<") || !strcmp(arr2[i], ">")) {
-				cmd_redir(arr2);
+			if (!strcmp(arr2[i], "|")) {
+				cmd_pipe(arr2);
 			}
 		}
-		dup2(fd[0], STDIN_FILENO);
-		close(fd[1]);
-		close(fd[0]);
-		execvp(arr2[0], arr2);
 	}
+	return flag;
 }
 
 int main(int argc, char**argv) {
@@ -191,10 +197,14 @@ int main(int argc, char**argv) {
 			signal(SIGQUIT, SIG_DFL);
 			setpgid(0, 0);
 			tcsetpgrp(STDIN_FILENO, getpgid(0));
-			cmd_pipe(cmdvector);
-			cmd_redir(cmdvector);
-			execvp(cmdvector[0], cmdvector);
-			fatal("main()");
+			if (cmd_pipe(cmdvector)) {
+				exit(0);
+			}
+			else {
+				cmd_redir(cmdvector);
+				execvp(cmdvector[0], cmdvector);
+				fatal("main()");
+			}
 		case -1:
 			fatal("main()");
 		default:
@@ -206,5 +216,4 @@ int main(int argc, char**argv) {
 	}
 	return 0;
 }
-
 
