@@ -109,62 +109,129 @@ int cmd_redir(char **cmd) {
 	}
 	return 0;
 }
-int cmd_pipe(char **cmd) {
-	int i, k;
-	int flag = 0;
-	pid_t pid1, pid2;
-	int fd[2];
-	char* arr1[MAX_CMD_ARG];
-	char* arr2[MAX_CMD_ARG];
+void join(char **cmd1, char **cmd2) {
+	int p[2];
+	pid_t pid;
+	switch (pid = fork()) {
+	case 0:
+		break;
+	default:
+		wait(NULL);
+		return;
+	}
+	pipe(p);
+	switch (pid = fork()) {
+	case 0:
+		dup2(p[1],STDOUT_FILENO);
+		close(p[0]);
+		close(p[1]);
+		execvp(cmd1[0], cmd1);
+	default:
+		dup2(p[0], STDIN_FILENO);
+		close(p[0]);
+		close(p[1]);
+		execvp(cmd2[0], cmd2);
+	}
+}
+void join2(char **cmd, char **cmd1, char **cmd2) {
+	int p1[2], p2[2];
+	pid_t pid, pid1, pid2;
+	switch (pid = fork()) {
+	case 0:
+		break;
+	default:
+		waitpid(pid, NULL, 0);
+		return;
+	}
+	pipe(p1);
+	switch (pid1 = fork()) {
+	case 0:
+		break;
+	default:
+		waitpid(pid1, NULL, 0);
+		dup2(p1[0], STDIN_FILENO);
+		close(p1[0]);
+		close(p1[1]);
+		execvp(cmd2[0], cmd2);
+	}
+	pipe(p2);
+	switch (pid2 = fork()) {
+	case 0:
+		dup2(p2[1], STDOUT_FILENO);
+		close(p2[1]);	close(p2[0]);
+		close(p1[1]);	close(p1[0]);
+		execvp(cmd[0], cmd);
+	default:
+		waitpid(pid2, NULL, 0);
+		dup2(p2[0], STDIN_FILENO);
+		dup2(p1[1], STDOUT_FILENO);
+		close(p2[0]);	close(p2[1]);
+		close(p1[0]);	close(p1[0]);
+		execvp(cmd1[0], cmd1);
+	}
+	return;
+}
+void cmd_pipe1(char **cmd, int n) {
+	int i, j;
+	char *cmd_buf[MAX_CMD_ARG];
+	for (i = n + 1, j = 0; cmd[i] != NULL; i++, j++) {
+		cmd_buf[j] = cmd[i];
+		if (cmd[i + 1] == NULL) {
+			cmd_buf[i] = NULL;
+		}
+	}
+	for (i = n; cmd[i] != NULL; i++) {
+		cmd[i] = NULL;
+	}
+	join(cmd, cmd_buf);
+	exit(0);
+}
+void cmd_pipe2(char **cmd, int n, int m) {
+	int i, j;
+	char *cmd_buf1[MAX_CMD_ARG];
+	char *cmd_buf2[MAX_CMD_ARG];
+	for (i = n + 1, j = 0; i < m; i++, j++) {
+		cmd_buf1[j] = cmd[i];
+		if (i == m - 1) {
+			cmd_buf1[i] = NULL;
+		}
+	}
+	for (i = m + 1, j = 0; cmd[i] != NULL; i++, j++) {
+		cmd_buf2[j] = cmd[i];
+		if (cmd[i + 1] == NULL) {
+			cmd_buf2[i] = NULL;
+		}
+	}
+	for (i = n; cmd[i] != NULL; i++) {
+		cmd[i] = NULL;
+	}
+	join2(cmd, cmd_buf1, cmd_buf2);
+	exit(0);
+}
+void cmd_pipe_exec(char **cmd) {
+	int i;
+	int cnt = 0;
+	int cnt1_i, cnt2_i;
 	for (i = 0; cmd[i] != NULL; i++) {
+		if (!strcmp(cmd[i], ">") || !strcmp(cmd[i], "<")) {
+			cmd_redir(cmd);
+		}
 		if (!strcmp(cmd[i], "|")) {
-			arr1[i] = NULL;
-			flag = 1;
-			break;
-		}
-		arr1[i] = cmd[i];
-	}
-	if (flag == 1) {
-		int j = 0;
-		for (i = i + 1; cmd[i] != NULL; i++) {
-			arr2[j] = cmd[i];
-			j++;
-		}
-		pipe(fd);
-
-		switch (pid1 = fork()) {
-		case 0:
-			for (i = 0; arr1[i] != NULL; i++) {
-				if (!strcmp(arr1[i], "<") || !strcmp(arr1[i], ">")) {
-					cmd_redir(arr1);
-					break;
-				}
-			}
-			dup2(fd[1], STDOUT_FILENO);
-			close(fd[1]);
-			close(fd[0]);
-			execvp(arr1[0], arr1);
-		}
-		switch (pid2 = fork()) {
-		case 0:
-			for (i = 0; arr2[i] != NULL; i++) {
-				if (!strcmp(arr2[i], "<") || !strcmp(arr2[i], ">")) {
-					cmd_redir(arr2);
-					break;
-				}
-			}
-			dup2(fd[0], STDIN_FILENO);
-			close(fd[1]);
-			close(fd[0]);
-			execvp(arr2[0], arr2);
-		}
-		for (i = 0; arr2[i] != NULL; i++) {
-			if (!strcmp(arr2[i], "|")) {
-				cmd_pipe(arr2);
-			}
+			cnt++;
+			if (cnt == 1)
+				cnt1_i = i;
+			if (cnt == 2)
+				cnt2_i = i;
 		}
 	}
-	return flag;
+	if (cnt == 1) {
+		cmd_pipe1(cmd, cnt1_i);
+		exit(0);
+	}
+	if (cnt == 2) {
+		cmd_pipe2(cmd, cnt1_i, cnt2_i);
+		exit(0);
+	}
 }
 
 int main(int argc, char**argv) {
@@ -197,14 +264,11 @@ int main(int argc, char**argv) {
 			signal(SIGQUIT, SIG_DFL);
 			setpgid(0, 0);
 			tcsetpgrp(STDIN_FILENO, getpgid(0));
-			if (cmd_pipe(cmdvector)) {
-				exit(0);
-			}
-			else {
-				cmd_redir(cmdvector);
-				execvp(cmdvector[0], cmdvector);
-				fatal("main()");
-			}
+
+			cmd_pipe_exec(cmdvector);
+			execvp(cmdvector[0], cmdvector);
+			fatal("main()");
+
 		case -1:
 			fatal("main()");
 		default:
