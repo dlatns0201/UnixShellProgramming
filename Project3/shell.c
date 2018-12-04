@@ -9,6 +9,7 @@
 
 #define MAX_CMD_ARG 10
 
+void cmd_pipe_exec(char **cmd);
 const char *prompt = "myshell> ";
 char* cmdvector[MAX_CMD_ARG];
 char  cmdline[BUFSIZ];
@@ -62,6 +63,7 @@ void cmd_bg(char **cmd) {
 		setpgid(0, 0);
 
 		cmd[cmdsize - 1] = NULL;
+		cmd_pipe_exec(cmdvector);
 		execvp(cmd[0], cmd);
 		fatal("main()");
 	case -1:
@@ -79,7 +81,7 @@ int cmd_redir(char **cmd) {
 			}
 			else {
 				if (!strcmp(cmd[i], ">")) {
-					if ((fd = open(cmd[i + 1], O_RDWR | O_CREAT, 0644)) == -1) {
+					if ((fd = open(cmd[i + 1], O_RDWR | O_CREAT | O_TRUNC, 0644)) == -1) {
 						return -1;
 					}
 					else {
@@ -108,61 +110,61 @@ void join(char **cmd1, char **cmd2) {
 	int p[2];
 	pid_t pid;
 	switch (pid = fork()) {
-	case 0:
-		break;
-	default:
-		wait(NULL);
-		return;
+		case 0:
+			break;
+		default:
+			wait(NULL);
+			return;
 	}
 	pipe(p);
 	switch (pid = fork()) {
-	case 0:
-		dup2(p[1],STDOUT_FILENO);
-		close(p[0]);
-		close(p[1]);
-		execvp(cmd1[0], cmd1);
-	default:
-		dup2(p[0], STDIN_FILENO);
-		close(p[0]);
-		close(p[1]);
-		execvp(cmd2[0], cmd2);
+		case 0:
+			dup2(p[1],STDOUT_FILENO);
+			close(p[0]);
+			close(p[1]);
+			execvp(cmd1[0], cmd1);
+		default:
+			dup2(p[0], STDIN_FILENO);
+			close(p[0]);
+			close(p[1]);
+			execvp(cmd2[0], cmd2);
 	}
 }
 void join2(char **cmd, char **cmd1, char **cmd2) {
 	int p1[2], p2[2];
 	pid_t pid, pid1, pid2;
 	switch (pid = fork()) {
-	case 0:
-		break;
-	default:
-		waitpid(pid, NULL, 0);
-		return;
+		case 0:
+			break;
+		default:
+			waitpid(pid, NULL, 0);
+			return;
 	}
 	pipe(p1);
 	switch (pid1 = fork()) {
-	case 0:
-		break;
-	default:
-		waitpid(pid1, NULL, 0);
-		dup2(p1[0], STDIN_FILENO);
-		close(p1[0]);
-		close(p1[1]);
-		execvp(cmd2[0], cmd2);
+		case 0:
+			break;
+		default:
+			waitpid(pid1, NULL, 0);
+			dup2(p1[0], STDIN_FILENO);
+			close(p1[0]);
+			close(p1[1]);
+			execvp(cmd2[0], cmd2);
 	}
 	pipe(p2);
 	switch (pid2 = fork()) {
-	case 0:
-		dup2(p2[1], STDOUT_FILENO);
-		close(p2[1]);	close(p2[0]);
-		close(p1[1]);	close(p1[0]);
-		execvp(cmd[0], cmd);
-	default:
-		waitpid(pid2, NULL, 0);
-		dup2(p2[0], STDIN_FILENO);
-		dup2(p1[1], STDOUT_FILENO);
-		close(p2[0]);	close(p2[1]);
-		close(p1[0]);	close(p1[0]);
-		execvp(cmd1[0], cmd1);
+		case 0:
+			dup2(p2[1], STDOUT_FILENO);
+			close(p2[1]);	close(p2[0]);
+			close(p1[1]);	close(p1[0]);
+			execvp(cmd[0], cmd);
+		default:
+			waitpid(pid2, NULL, 0);
+			dup2(p2[0], STDIN_FILENO);
+			dup2(p1[1], STDOUT_FILENO);
+			close(p2[0]);	close(p2[1]);
+			close(p1[0]);	close(p1[0]);
+			execvp(cmd1[0], cmd1);
 	}
 	return;
 }
@@ -204,13 +206,24 @@ void cmd_pipe2(char **cmd, int n, int m) {
 	exit(0);
 }
 void cmd_pipe_exec(char **cmd) {
-	int i;
+	int i,fd;
+	int flag=0;
+	pid_t pid;
 	int cnt = 0;
 	int cnt1_i, cnt2_i;
 	for (i = 0; cmd[i] != NULL; i++) {
-		if (!strcmp(cmd[i], ">") || !strcmp(cmd[i], "<")) {
-			cmd_redir(cmd);
+		if (!strcmp(cmd[i], ">") || !strcmp(cmd[i], "<") && cmd[i]) {
+			cmd_redir(cmd);	
+			flag=1;
+			switch(pid=fork()){
+				case 0:
+					cmd_redir(cmd);
+					execvp(cmd[0],cmd);
+				default:
+					waitpid(pid,NULL,0);
+			}
 		}
+
 		if (!strcmp(cmd[i], "|")) {
 			cnt++;
 			if (cnt == 1)
@@ -225,6 +238,8 @@ void cmd_pipe_exec(char **cmd) {
 	}
 	else if (cnt == 2) {
 		cmd_pipe2(cmd, cnt1_i, cnt2_i);
+		exit(0);
+	}else if(flag==1){
 		exit(0);
 	}
 }
@@ -254,22 +269,22 @@ int main(int argc, char**argv) {
 			continue;
 		}
 		switch (pid = fork()) {
-		case 0:
-			signal(SIGINT, SIG_DFL);
-			signal(SIGQUIT, SIG_DFL);
-			setpgid(0, 0);
-			tcsetpgrp(STDIN_FILENO, getpgid(0));
-//			cmd_redir(cmdvector);
-			cmd_pipe_exec(cmdvector);
-			execvp(cmdvector[0], cmdvector);
-			fatal("main()");
+			case 0:
+				signal(SIGINT, SIG_DFL);
+				signal(SIGQUIT, SIG_DFL);
+				setpgid(0, 0);
+				tcsetpgrp(STDIN_FILENO, getpgid(0));
+				cmd_pipe_exec(cmdvector);
+					
+				execvp(cmdvector[0], cmdvector);
+				fatal("main()");
 
-		case -1:
-			fatal("main()");
-		default:
-			waitpid(pid, NULL, 0);
-			tcsetpgrp(STDIN_FILENO, getpgid(0));
-			cmd_cd(cmdvector);
+			case -1:
+				fatal("main()");
+			default:
+				waitpid(pid, NULL, 0);
+				tcsetpgrp(STDIN_FILENO, getpgid(0));
+				cmd_cd(cmdvector);
 		}
 
 	}
