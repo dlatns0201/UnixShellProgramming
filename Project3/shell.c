@@ -98,11 +98,6 @@ int cmd_redir(char **cmd) {
 				for (i = i; cmd[i] != NULL; i++) {
 					cmd[i] = cmd[i + 2];
 				}
-				for (i = 0; cmd[i] != NULL; i++) {
-					if (!strcmp(cmd[i], "<") || !strcmp(cmd[i], ">") && cmd[i + 1]) {
-						cmd_redir(cmd);
-					}
-				}
 
 			}
 		}
@@ -228,7 +223,7 @@ void cmd_pipe_exec(char **cmd) {
 		cmd_pipe1(cmd, cnt1_i);
 		exit(0);
 	}
-	if (cnt == 2) {
+	else if (cnt == 2) {
 		cmd_pipe2(cmd, cnt1_i, cnt2_i);
 		exit(0);
 	}
@@ -264,7 +259,7 @@ int main(int argc, char**argv) {
 			signal(SIGQUIT, SIG_DFL);
 			setpgid(0, 0);
 			tcsetpgrp(STDIN_FILENO, getpgid(0));
-
+//			cmd_redir(cmdvector);
 			cmd_pipe_exec(cmdvector);
 			execvp(cmdvector[0], cmdvector);
 			fatal("main()");
@@ -280,4 +275,3 @@ int main(int argc, char**argv) {
 	}
 	return 0;
 }
-
