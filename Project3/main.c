@@ -12,7 +12,7 @@ int main() {
 	sigaction(SIGQUIT, &act, NULL);
 	sigaction(SIGTSTP, &act, NULL);
 
-	while (cmd_input(prompt) != EOF) {
+	while (cmd_input(prompt)) {
 		readyTo_run();
 	}
 	return 0;

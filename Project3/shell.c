@@ -1,11 +1,11 @@
 #include "shell.h"
 
 static char* cmdvector[MAX_CMD_ARG];
-static char  cmdline[BUFSIZ];
+static char cmdline[BUFSIZ];
 static int numtokens;
 static int fg_pid;
 static int int_pid;
-static int type[MAX_CMD_ARG];
+int type[MAX_CMD_ARG];
 
 void handler_func(int signo) {
 	if (fg_pid == 0) {
@@ -30,24 +30,31 @@ void handler_func(int signo) {
 
 void makelist(char *s, const char *delimiters, char** list) {
 	int i = 0;
-	int err=-1;
 	numtokens = 0;
 	char *snew = NULL;
-	int flag = 0;
+	int flag = 1;
 	if ((s == NULL) || (delimiters == NULL)) return;
-
 	snew = s + strspn(s, delimiters);       /* delimiters¸¦ skip */
 
 	while (1) {
+		printf("num: %d\n",numtokens);
 		if (flag) {
-			flag++;
+			flag--;
 			list[numtokens] = strtok(snew, delimiters);
 
-		}else
+		}else{
+			printf("%s\n",list[numtokens]);
+			printf("222\n");
 			list[numtokens] = strtok(NULL, delimiters);
-
-		switch (*list[numtokens]) {
-		case '\0': break;
+			if(list[numtokens]==NULL)
+				return;
+		}
+		switch (list[numtokens][0]) {
+		case '\n':
+			type[numtokens]=EOL;
+			break;
+		case '\0':
+			return;
 		case '&':
 			type[numtokens] = AMPERSAND;
 			break;
@@ -159,22 +166,15 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 
 int cmd_input(const char *prompt) {
 	int cnt = 0;
-	char c;
+	int str_len;
 	printf("%s ", prompt);
-	while (1) {
-		if ((c = getchar()) == EOF)
-			return EOF;
-		if (cnt < BUFSIZ)
-			cmdline[cnt++] = c;
-		if (c == '\n' && cnt < BUFSIZ) {
-			cmdline[cnt] = '\0';
-			return cnt;
-		}
-		if (c == '\n'){
-			printf("Input arg is too long\n");
-			printf("%s", prompt);
-			cnt = 0;
-		}
+	scanf("%s",cmdline);
+	str_len=strlen(cmdline);
+	if(str_len==0)
+		return 0;
+	else{
+		cmdline[str_len]='\0';
+		return 1;
 	}
 }
 
@@ -182,10 +182,11 @@ void readyTo_run() {
 	int i;
 	int in = -1, out = -1, where;
 	int fd[2];
-	int *type;
 
 	int_pid = 0;
 	makelist(cmdline, " \t", cmdvector);
+	printf("%s\n",cmdvector[0]);
+	printf("%s\n",cmdvector[1]);
 	for (i = 0; i < numtokens; i++) {
 		where = (type[i] == AMPERSAND) ? BACKGROUND : FOREGROUND;
 		switch (type[i]) {
@@ -209,24 +210,23 @@ void readyTo_run() {
 				return;
 			}
 			out = fd[1];
-
-			if (i != 0) {
-				cmdvector[i] = NULL;
-				process_run(cmdvector, where, in, out);
-				if (in != -1) {
-					close(in);
-					in = -1;
-				}
-				if (out != -1) {
-					close(out);
-					out = -1;
-				}
-
-			}
-			if (type[i] == PIPELINE)
-				in = fd[0];
-			break;
-
 		}
 	}
+	if (i != 0) {
+		cmdvector[i] = NULL;
+		process_run(cmdvector, where, in, out);
+		if (in != -1) {
+			close(in);
+			in = -1;
+		}
+		if (out != -1) {
+			close(out);
+			out = -1;
+		}
+
+	}
+	if (type[i] == PIPELINE)
+		in = fd[0];
+	return;
+
 }

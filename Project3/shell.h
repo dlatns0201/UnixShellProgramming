@@ -14,11 +14,11 @@
 #define PIPELINE 3
 #define LESS 4
 #define GREATER 5
+#define EOL 6
 
 #define FOREGROUND 0
 #define BACKGROUND 1
 
 void handler_func(int signo);
-void makelist(char *s, const char *delimiters, char **list);
 int cmd_input(const char *prompt);
 void readyTo_run();
