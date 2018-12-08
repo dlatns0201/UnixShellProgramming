@@ -5,6 +5,7 @@ static char  cmdline[BUFSIZ];
 static int numtokens;
 static int fg_pid;
 static int int_pid;
+static int type[MAX_CMD_ARG];
 
 void handler_func(int signo) {
 	if (fg_pid == 0) {
@@ -27,14 +28,13 @@ void handler_func(int signo) {
 	}
 }
 
-int *makelist(char *s, const char *delimiters, char** list) {
+void makelist(char *s, const char *delimiters, char** list) {
 	int i = 0;
 	int err=-1;
 	numtokens = 0;
-	int type[MAX_CMD_ARG];
 	char *snew = NULL;
 	int flag = 0;
-	if ((s == NULL) || (delimiters == NULL)) return &err;
+	if ((s == NULL) || (delimiters == NULL)) return;
 
 	snew = s + strspn(s, delimiters);       /* delimiters¸¦ skip */
 
@@ -63,10 +63,10 @@ int *makelist(char *s, const char *delimiters, char** list) {
 		default:
 			type[numtokens] = ARG;
 		}
-		if (numtokens == (MAX_CMD_ARG - 1)) return &err;
+		if (numtokens == (MAX_CMD_ARG - 1)) return;
 		numtokens++;
 	}
-	return type;
+	return;
 }
 
 
@@ -157,7 +157,7 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 
 
 
-int cmd_input(char *prompt) {
+int cmd_input(const char *prompt) {
 	int cnt = 0;
 	char c;
 	printf("%s ", prompt);
@@ -167,7 +167,7 @@ int cmd_input(char *prompt) {
 		if (cnt < BUFSIZ)
 			cmdline[cnt++] = c;
 		if (c == '\n' && cnt < BUFSIZ) {
-			cmdline[cnt] = NULL;
+			cmdline[cnt] = '\0';
 			return cnt;
 		}
 		if (c == '\n'){
@@ -185,7 +185,7 @@ void readyTo_run() {
 	int *type;
 
 	int_pid = 0;
-	type=makelist(cmdline, " \t", cmdvector);
+	makelist(cmdline, " \t", cmdvector);
 	for (i = 0; i < numtokens; i++) {
 		where = (type[i] == AMPERSAND) ? BACKGROUND : FOREGROUND;
 		switch (type[i]) {

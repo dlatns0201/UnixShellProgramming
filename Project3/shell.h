@@ -19,6 +19,6 @@
 #define BACKGROUND 1
 
 void handler_func(int signo);
-int *makelist(char *s, const char *delimiters, char **list);
-int cmd_input(char *prompt);
+void makelist(char *s, const char *delimiters, char **list);
+int cmd_input(const char *prompt);
 void readyTo_run();
