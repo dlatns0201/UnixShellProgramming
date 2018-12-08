@@ -29,11 +29,12 @@ void handler_func(int signo) {
 
 int *makelist(char *s, const char *delimiters, char** list) {
 	int i = 0;
+	int err=-1;
 	numtokens = 0;
 	int type[MAX_CMD_ARG];
 	char *snew = NULL;
 	int flag = 0;
-	if ((s == NULL) || (delimiters == NULL)) return -1;
+	if ((s == NULL) || (delimiters == NULL)) return &err;
 
 	snew = s + strspn(s, delimiters);       /* delimiters¸¦ skip */
 
@@ -46,7 +47,7 @@ int *makelist(char *s, const char *delimiters, char** list) {
 			list[numtokens] = strtok(NULL, delimiters);
 
 		switch (*list[numtokens]) {
-		case NULL: break;
+		case '\0': break;
 		case '&':
 			type[numtokens] = AMPERSAND;
 			break;
@@ -62,14 +63,14 @@ int *makelist(char *s, const char *delimiters, char** list) {
 		default:
 			type[numtokens] = ARG;
 		}
-		if (numtokens == (MAX_CMD_ARG - 1)) return -1;
+		if (numtokens == (MAX_CMD_ARG - 1)) return &err;
 		numtokens++;
 	}
 	return type;
 }
 
 
-static int runcommand(char **cmd, int where, int in, int out) { /* Execute a command with optional wait */
+static int process_run(char **cmd, int where, int in, int out) { /* Execute a command with optional wait */
 	int pid;
 	int ret, status;
 
@@ -193,14 +194,14 @@ void readyTo_run() {
 			}
 			break;
 		case GREATER:
-			if ((out = open(cmdvector[i + 1], O_RDWR | O_REAT | O_TRUNC, 0666)) == -1) {
+			if ((out = open(cmdvector[i + 1], O_RDWR | O_CREAT | O_TRUNC, 0666)) == -1) {
 				fputs("out error()", stderr);
 				return;
 			}
 			break;
 		case PIPELINE:
 			if (pipe(fd) == -1) {
-				fputs("pipe error()");
+				fputs("pipe error()",stderr);
 				return;
 			}
 			out = fd[1];
