@@ -102,7 +102,7 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 
 	/* Ignore signal (linux) */
 	struct sigaction act;
-	act.sa_handler = SIG_IGN;
+	act.sa_handler = SIG_DFL;
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = SA_RESTART;
 
@@ -166,7 +166,11 @@ int cmd_input(char *prompt) {
 			return EOF;
 		if (cnt < BUFSIZ)
 			cmdline[cnt++] = c;
-		if (c == '\n' && cnt == BUFSIZ) {
+		if (c == '\n' && cnt < BUFSIZ) {
+			cmdline[cnt] = NULL;
+			return cnt;
+		}
+		if (c == '\n'){
 			printf("Input arg is too long\n");
 			printf("%s", prompt);
 			cnt = 0;
