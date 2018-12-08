@@ -1,4 +1,4 @@
-#include "shell.h"
+#include "shell.h"//
 
 static char* cmdvector[MAX_CMD_ARG];
 static char cmdline[BUFSIZ];
@@ -37,14 +37,11 @@ void makelist(char *s, const char *delimiters, char** list) {
 	snew = s + strspn(s, delimiters);       /* delimiters¸¦ skip */
 
 	while (1) {
-		printf("num: %d\n",numtokens);
 		if (flag) {
 			flag--;
 			list[numtokens] = strtok(snew, delimiters);
 
 		}else{
-			printf("%s\n",list[numtokens]);
-			printf("222\n");
 			list[numtokens] = strtok(NULL, delimiters);
 			if(list[numtokens]==NULL)
 				return;
@@ -78,7 +75,7 @@ void makelist(char *s, const char *delimiters, char** list) {
 
 
 static int process_run(char **cmd, int where, int in, int out) { /* Execute a command with optional wait */
-	int pid;
+	int pid,i;
 	int ret, status;
 
 	/* Implement "cd" command (change directory) */
@@ -133,7 +130,7 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 			dup2(out, 1);
 			close(out);
 		}
-
+		for(i=0; cmd[i]!=NULL; i++)
 		/* Run command */
 		execvp(*cmd, cmd);
 
@@ -167,66 +164,81 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 int cmd_input(const char *prompt) {
 	int cnt = 0;
 	int str_len;
-	printf("%s ", prompt);
-	scanf("%s",cmdline);
-	str_len=strlen(cmdline);
-	if(str_len==0)
+	fputs(prompt,stdout);
+	fgets(cmdline,BUFSIZ,stdin);
+	
+	cmdline[strlen(cmdline)-1]='\0';
+	if(!strcmp(cmdline,"exit")){
 		return 0;
-	else{
-		cmdline[str_len]='\0';
-		return 1;
 	}
+	return 1;
+	
 }
 
 void readyTo_run() {
-	int i;
+	int i,j,k;
 	int in = -1, out = -1, where;
 	int fd[2];
 
 	int_pid = 0;
 	makelist(cmdline, " \t", cmdvector);
-	printf("%s\n",cmdvector[0]);
-	printf("%s\n",cmdvector[1]);
 	for (i = 0; i < numtokens; i++) {
-		where = (type[i] == AMPERSAND) ? BACKGROUND : FOREGROUND;
 		switch (type[i]) {
-		case ARG:
-			break;
-		case LESS:
-			if ((in = open(cmdvector[i + 1], O_RDONLY)) == -1) {
-				fputs("in error()", stderr);
-				return;
-			}
-			break;
-		case GREATER:
-			if ((out = open(cmdvector[i + 1], O_RDWR | O_CREAT | O_TRUNC, 0666)) == -1) {
-				fputs("out error()", stderr);
-				return;
-			}
-			break;
-		case PIPELINE:
-			if (pipe(fd) == -1) {
-				fputs("pipe error()",stderr);
-				return;
-			}
-			out = fd[1];
-		}
-	}
-	if (i != 0) {
-		cmdvector[i] = NULL;
-		process_run(cmdvector, where, in, out);
-		if (in != -1) {
-			close(in);
-			in = -1;
-		}
-		if (out != -1) {
-			close(out);
-			out = -1;
-		}
+			case ARG:
+				break;
+			case LESS:
+				if ((in = open(cmdvector[i + 1], O_RDONLY)) == -1) {
+					fputs("in error()", stderr);
+					return;
+				}
+				for(j=i;cmdvector[j]!=NULL;j++){
+					cmdvector[j]=cmdvector[j+2];
+					type[j]=type[j+2];
+				}
+				i--;
+				numtokens-=2;
+				break;
+			case GREATER:
+				if ((out = open(cmdvector[i + 1], O_RDWR | O_CREAT | O_TRUNC, 0666)) == -1) {
+					fputs("out error()", stderr);
+					return;
+				}
+				for(j=i;cmdvector[j]!=NULL;j++){
+					cmdvector[j]=cmdvector[j+2];
+					type[j]=type[j+2];
+				}
+				numtokens-=2;
+				i--;
+				break;
+			case PIPELINE:
+				if (pipe(fd) == -1) {
+					fputs("pipe error()",stderr);
+					return;
+				}
+				out = fd[1];
+			case EOL:
+			case AMPERSAND:
+				where=(type[i]==AMPERSAND) ? BACKGROUND : FOREGROUND;
 
+
+				if (i != 0) {
+					cmdvector[i] = NULL;
+					process_run(cmdvector, where, in, out);
+					if (in != -1) {
+						close(in);
+						in = -1;
+					}
+					if (out != -1) {
+						close(out);
+						out = -1;
+					}
+
+				}
+				if (type[i] == PIPELINE)
+					in = fd[0];
+		}
 	}
-	if (type[i] == PIPELINE)
-		in = fd[0];
+	process_run(cmdvector,where,in,out);
 	return;
 
 }
