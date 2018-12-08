@@ -6,6 +6,7 @@ static int numtokens;
 static int fg_pid;
 static int int_pid;
 int type[MAX_CMD_ARG];
+static char * tmp[MAX_CMD_ARG];
 
 void handler_func(int signo) {
 	if (fg_pid == 0) {
@@ -77,7 +78,6 @@ void makelist(char *s, const char *delimiters, char** list) {
 static int process_run(char **cmd, int where, int in, int out) { /* Execute a command with optional wait */
 	int pid,i;
 	int ret, status;
-
 	/* Implement "cd" command (change directory) */
 	if (strcmp(cmd[0], "cd") == 0) {
 		if (cmd[2] == NULL) {
@@ -130,7 +130,6 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 			dup2(out, 1);
 			close(out);
 		}
-		for(i=0; cmd[i]!=NULL; i++)
 		/* Run command */
 		execvp(*cmd, cmd);
 
@@ -146,7 +145,7 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 	/* If child is background process, print pid of child and exit */
 	if (where == BACKGROUND) {
 		fg_pid = 0;
-		printf("%d process is running at background", pid);
+		printf("%d process is running at background\n", pid);
 		return 0;
 	}
 
@@ -154,7 +153,6 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 	while (((ret = wait(&status)) != pid) && (ret != -1)) {
 		// empty
 	}
-
 	fg_pid = 0;
 	return (ret == -1) ? 1 : status;
 }
@@ -179,6 +177,7 @@ void readyTo_run() {
 	int i,j,k;
 	int in = -1, out = -1, where;
 	int fd[2];
+	int flag=0;
 
 	int_pid = 0;
 	makelist(cmdline, " \t", cmdvector);
@@ -216,14 +215,18 @@ void readyTo_run() {
 					return;
 				}
 				out = fd[1];
-			case EOL:
 			case AMPERSAND:
-				where=(type[i]==AMPERSAND) ? BACKGROUND : FOREGROUND;
-
+				where=(type[i]==AMPERSAND)?BACKGROUND : FOREGROUND;
 
 				if (i != 0) {
 					cmdvector[i] = NULL;
+					if(flag==0){
 					process_run(cmdvector, where, in, out);
+}else{
+process_run(cmdvector,where,in,out);
+}
+					if(where==BACKGROUND)
+						return;
 					if (in != -1) {
 						close(in);
 						in = -1;
@@ -234,11 +237,22 @@ void readyTo_run() {
 					}
 
 				}
-				if (type[i] == PIPELINE)
+				if (type[i] == PIPELINE){
+					flag=1;
 					in = fd[0];
+					for(j=i+1,k=0;cmdvector[j]!=NULL;j++,k++){
+						tmp[k]=cmdvector[j];
+printf("%s\n",tmp[k]);
+					}
+				}
+
 		}
 	}
-	process_run(cmdvector,where,in,out);
+	if(flag){
+	process_run(tmp,where,in,out);
+	}else{
+		process_run(cmdvector,where,in,out);
+	}
 	return;
 
 }
