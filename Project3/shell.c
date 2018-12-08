@@ -173,7 +173,7 @@ int cmd_input(char *prompt) {
 	}
 }
 
-void readyTo_Run() {
+void readyTo_run() {
 	int i;
 	int in = -1, out = -1, where;
 	int fd[2];
