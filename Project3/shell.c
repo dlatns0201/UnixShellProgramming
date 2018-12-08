@@ -48,25 +48,25 @@ void makelist(char *s, const char *delimiters, char** list) {
 				return;
 		}
 		switch (list[numtokens][0]) {
-		case '\n':
-			type[numtokens]=EOL;
-			break;
-		case '\0':
-			return;
-		case '&':
-			type[numtokens] = AMPERSAND;
-			break;
-		case '|':
-			type[numtokens] = PIPELINE;
-			break;
-		case '<':
-			type[numtokens] = LESS;
-			break;
-		case '>' :
-			type[numtokens] = GREATER;
-			break;
-		default:
-			type[numtokens] = ARG;
+			case '\n':
+				type[numtokens]=EOL;
+				break;
+			case '\0':
+				return;
+			case '&':
+				type[numtokens] = AMPERSAND;
+				break;
+			case '|':
+				type[numtokens] = PIPELINE;
+				break;
+			case '<':
+				type[numtokens] = LESS;
+				break;
+			case '>' :
+				type[numtokens] = GREATER;
+				break;
+			default:
+				type[numtokens] = ARG;
 		}
 		if (numtokens == (MAX_CMD_ARG - 1)) return;
 		numtokens++;
@@ -164,13 +164,13 @@ int cmd_input(const char *prompt) {
 	int str_len;
 	fputs(prompt,stdout);
 	fgets(cmdline,BUFSIZ,stdin);
-	
+
 	cmdline[strlen(cmdline)-1]='\0';
 	if(!strcmp(cmdline,"exit")){
 		return 0;
 	}
 	return 1;
-	
+
 }
 
 void readyTo_run() {
@@ -221,10 +221,10 @@ void readyTo_run() {
 				if (i != 0) {
 					cmdvector[i] = NULL;
 					if(flag==0){
-					process_run(cmdvector, where, in, out);
-}else{
-process_run(cmdvector,where,in,out);
-}
+						process_run(cmdvector, where, in, out);
+					}else{
+						process_run(tmp,where,in,out);
+					}
 					if(where==BACKGROUND)
 						return;
 					if (in != -1) {
@@ -241,15 +241,25 @@ process_run(cmdvector,where,in,out);
 					flag=1;
 					in = fd[0];
 					for(j=i+1,k=0;cmdvector[j]!=NULL;j++,k++){
-						tmp[k]=cmdvector[j];
-printf("%s\n",tmp[k]);
+						if(!strcmp(cmdvector[j],"|"))
+							break;
+						else if(!strcmp(cmdvector[j],"<")){
+							i=j-1;
+							break;
+
+						}else if(!strcmp(cmdvector[j],">")){
+							i=j-1;
+							break;
+						}else{
+							tmp[k]=cmdvector[j];
+						}
 					}
 				}
 
 		}
 	}
 	if(flag){
-	process_run(tmp,where,in,out);
+		process_run(tmp,where,in,out);
 	}else{
 		process_run(cmdvector,where,in,out);
 	}
