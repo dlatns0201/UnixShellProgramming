@@ -1,4 +1,4 @@
-#include "shell.h"//
+#include "shell.h"
 
 static char* cmdvector[MAX_CMD_ARG];
 static char cmdline[BUFSIZ];
@@ -9,7 +9,7 @@ int type[MAX_CMD_ARG];
 static char * tmp[MAX_CMD_ARG];
 
 void handler_func(int signo) {
-	if (fg_pid == 0) {
+	if (fg_pid == 0) {//background process catch
 		if (signo == SIGINT)
 			puts("SIGINT catch");
 		else if (signo == SIGQUIT)
@@ -106,7 +106,7 @@ static int process_run(char **cmd, int where, int in, int out) { /* Execute a co
 
 	/* Ignore signal (linux) */
 	struct sigaction act;
-	act.sa_handler = SIG_DFL;
+	act.sa_handler = SIG_IGN;
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = SA_RESTART;
 
@@ -220,11 +220,7 @@ void readyTo_run() {
 
 				if (i != 0) {
 					cmdvector[i] = NULL;
-					if(flag==0){
-						process_run(cmdvector, where, in, out);
-					}else{
-						process_run(tmp,where,in,out);
-					}
+					process_run(cmdvector, where, in, out);
 					if(where==BACKGROUND)
 						return;
 					if (in != -1) {
@@ -238,31 +234,19 @@ void readyTo_run() {
 
 				}
 				if (type[i] == PIPELINE){
-					flag=1;
 					in = fd[0];
-					for(j=i+1,k=0;cmdvector[j]!=NULL;j++,k++){
-						if(!strcmp(cmdvector[j],"|"))
-							break;
-						else if(!strcmp(cmdvector[j],"<")){
-							i=j-1;
-							break;
-
-						}else if(!strcmp(cmdvector[j],">")){
-							i=j-1;
-							break;
-						}else{
-							tmp[k]=cmdvector[j];
-						}
+					for(j=0; j<numtokens-i-1; j++){
+						cmdvector[j]=cmdvector[i+1+j];
+						cmdvector[i+1+j]=NULL;
+						type[j]=type[i+1+j];
+						type[i+1+j]=0;
 					}
+					numtokens-=(i+1);
+					i=0;
 				}
-
 		}
-	}
-	if(flag){
-		process_run(tmp,where,in,out);
-	}else{
-		process_run(cmdvector,where,in,out);
-	}
-	return;
 
+	}
+
+	process_run(cmdvector,where,in,out);
 }

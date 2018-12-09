@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-#define MAX_CMD_ARG 10
+#define MAX_CMD_ARG 15
 
 #define ARG 1
 #define AMPERSAND 2
